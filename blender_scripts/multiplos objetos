@@ -1,0 +1,55 @@
+import bpy
+import random
+
+bpy.ops.object.select_all(action='SELECT')
+bpy.ops.object.delete()
+
+# EXPERIMENTO: criar 3 objetos diferentes, com posições e cores distintas
+objetos_config = [
+    {"tipo": "cube", "location": (-2, 0, 1)},
+    {"tipo": "sphere", "location": (0, 0, 1)},
+    {"tipo": "cylinder", "location": (2, 0, 1)},
+]
+
+for i, config in enumerate(objetos_config):
+    if config["tipo"] == "cube":
+        bpy.ops.mesh.primitive_cube_add(size=1, location=config["location"])
+    elif config["tipo"] == "sphere":
+        bpy.ops.mesh.primitive_uv_sphere_add(radius=0.5, location=config["location"])
+    elif config["tipo"] == "cylinder":
+        bpy.ops.mesh.primitive_cylinder_add(radius=0.5, depth=1, location=config["location"])
+
+    obj = bpy.context.active_object
+    obj.name = f"Object_{i}_{config['tipo']}"
+
+    # Cor aleatória pra cada um
+    mat = bpy.data.materials.new(name=f"Mat_{i}")
+    mat.use_nodes = True
+    principled = mat.node_tree.nodes.get("Principled BSDF")
+    principled.inputs["Base Color"].default_value = (random.random(), random.random(), random.random(), 1.0)
+    obj.data.materials.append(mat)
+
+# Luz
+bpy.ops.object.light_add(type='SUN', location=(5, -5, 10))
+bpy.context.active_object.data.energy = 5
+
+# Câmera olhando pro centro da cena
+bpy.ops.object.camera_add(location=(0, -8, 4))
+camera = bpy.context.active_object
+bpy.context.scene.camera = camera
+
+bpy.ops.object.empty_add(type='PLAIN_AXES', location=(0, 0, 1))
+foco = bpy.context.active_object
+track = camera.constraints.new(type='TRACK_TO')
+track.target = foco
+track.up_axis = 'UP_Y'
+track.track_axis = 'TRACK_NEGATIVE_Z'
+
+# Render
+bpy.context.scene.render.engine = 'CYCLES'
+bpy.context.scene.cycles.samples = 64
+bpy.context.scene.render.film_transparent = False
+bpy.context.scene.render.image_settings.color_mode = 'RGB'
+bpy.context.scene.view_settings.view_transform = 'Standard'
+bpy.context.scene.render.filepath = "/home/maju/synthetic-datasets-blender-experiments/assets/render_multiplos_objetos.png"
+bpy.ops.render.render(write_still=True)
