@@ -1,0 +1,54 @@
+import bpy
+
+# 1. Limpar a cena
+bpy.ops.object.select_all(action='SELECT')
+bpy.ops.object.delete()
+
+# 2. Objeto-alvo
+bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0, 1))
+target_object = bpy.context.active_object
+target_object.name = "TargetObject"
+
+# 3. Luz
+bpy.ops.object.light_add(type='SUN', location=(5, -5, 10))
+bpy.context.active_object.data.energy = 3
+
+# 4. Caminho em elipse (círculo achatado num eixo)
+bpy.ops.curve.primitive_nurbs_circle_add(radius=6, location=(0, 0, 2))
+path = bpy.context.active_object
+path.name = "CameraPathElipse"
+path.scale = (1.0, 0.5, 1.0)   # achata o eixo Y -> vira elipse
+
+# 5. Câmera direto no caminho (sem container, sem Child Of)
+bpy.ops.object.camera_add()
+camera = bpy.context.active_object
+bpy.context.scene.camera = camera
+
+follow = camera.constraints.new(type='FOLLOW_PATH')
+follow.target = path
+follow.use_fixed_location = True    # ignora o frame da timeline
+follow.forward_axis = 'FORWARD_Y'
+follow.up_axis = 'UP_Z'
+
+track = camera.constraints.new(type='TRACK_TO')
+track.target = target_object
+track.track_axis = 'TRACK_NEGATIVE_Z'
+track.up_axis = 'UP_Y'
+
+# 6. Configuração de render
+bpy.context.scene.render.engine = 'CYCLES'
+bpy.context.scene.cycles.samples = 64
+bpy.context.scene.cycles.use_denoising = False   # evita o bug do denoiser na VM
+bpy.context.scene.render.image_settings.color_mode = 'RGB'
+bpy.context.scene.view_settings.view_transform = 'Standard'
+
+# 7. Renderiza N posições ao longo da elipse (mini dataset multi-ângulo)
+N_IMAGENS = 8
+for i in range(N_IMAGENS):
+    follow.offset_factor = i / N_IMAGENS   # 0.0, 0.125, 0.25, ... 0.875
+    bpy.context.view_layer.update()
+    bpy.context.scene.render.filepath = (
+        f"/home/maju/synthetic-datasets-blender-experiments/assets/render_elipse_{i}.png"
+    )
+    bpy.ops.render.render(write_still=True)
+    print(f"Render {i+1}/{N_IMAGENS} — offset_factor={follow.offset_factor:.3f}")
